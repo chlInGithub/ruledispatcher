@@ -24,4 +24,15 @@ public @interface AsAfterAction {
      * @return 应用
      */
     String app();
+
+
+    /**
+     * @return 规则
+     */
+    String rule() default "default";
+
+    /**
+     * @return 优先级 越小优先级越高,默认50.
+     */
+    int priority() default 50;
 }

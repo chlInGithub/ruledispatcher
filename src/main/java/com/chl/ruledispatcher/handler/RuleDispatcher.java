@@ -13,7 +13,7 @@ import com.chl.ruledispatcher.anotations.AsRuleHandler;
 import com.chl.ruledispatcher.handler.param.RuleDispatcherContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-
+import org.springframework.util.CollectionUtils;
 
 /**
  * 规则调度器
@@ -140,14 +140,18 @@ public class RuleDispatcher {
             return false;
         }
 
-        PreAction preAction = sceneAppHandlerNode.preAction;
-        if (null == preAction) {
+        if (CollectionUtils.isEmpty(sceneAppHandlerNode.preActions)) {
             return false;
         }
 
-        boolean isResult = preAction.handle(ruleDispatcherContext);
+        for (PreAction preAction : sceneAppHandlerNode.preActions) {
+            boolean isReturn = preAction.handle(ruleDispatcherContext);
+            if (isReturn) {
+                return true;
+            }
+        }
 
-        return isResult;
+        return false;
     }
 
     /**
@@ -162,12 +166,13 @@ public class RuleDispatcher {
             return;
         }
 
-        AfterAction afterAction = sceneAppHandlerNode.afterAction;
-        if (null == afterAction) {
+        if (CollectionUtils.isEmpty(sceneAppHandlerNode.afterActions)) {
             return;
         }
 
-        afterAction.handle(ruleDispatcherContext);
+        for (AfterAction afterAction : sceneAppHandlerNode.afterActions) {
+            afterAction.handle(ruleDispatcherContext);
+        }
     }
 
     private static SceneAppHandlerNode getSceneAppHandlerNode(String scene, String appType) {
@@ -179,17 +184,19 @@ public class RuleDispatcher {
             throw new RuntimeException("RuleDispatcher noSceneAppHandlerNode " + scene + " " + appType);
         }
 
-        if (sceneAppHandlerNode.preAction == null) {
+        if (CollectionUtils.isEmpty(sceneAppHandlerNode.preActions)) {
             if (log.isInfoEnabled()) {
                 log.info("RuleDispatcher noPreAction {} {} {}", scene, appType, sceneAppHandlerNode);
             }
         }
-        if (sceneAppHandlerNode.afterAction == null) {
+
+        if (CollectionUtils.isEmpty(sceneAppHandlerNode.afterActions)) {
             if (log.isInfoEnabled()) {
                 log.info("RuleDispatcher noAfterAction {} {} {}", scene, appType, sceneAppHandlerNode);
             }
         }
-        if (isEmpty(sceneAppHandlerNode.ruleHandlers)) {
+
+        if (CollectionUtils.isEmpty(sceneAppHandlerNode.ruleHandlers)) {
             if (log.isInfoEnabled()) {
                 log.info("RuleDispatcher noRuleHandlers {} {} {}", scene, appType, sceneAppHandlerNode);
             }
@@ -254,13 +261,16 @@ public class RuleDispatcher {
     private static void addPreAction(PreAction preAction) {
         String app = preAction.asPreAction.app();
         String scene = preAction.asPreAction.scene();
+        String rule = preAction.asPreAction.rule();
 
         initNode(app, scene);
 
         SceneAppHandlerNode sceneAppHandlerNode = sceneHandlerMap.get(scene).appHandlerMap.get(app);
-        if (sceneAppHandlerNode.preAction == null) {
-            sceneAppHandlerNode.preAction = preAction;
-            log.info("RuleDispatcher add preAction for {} {} ", scene, app);
+        if (!sceneAppHandlerNode.preActionMap.containsKey(rule)) {
+            sceneAppHandlerNode.preActionMap.put(rule, preAction);
+            sceneAppHandlerNode.preActions.add(preAction);
+            sceneAppHandlerNode.preActions.sort(PreAction.comparator);
+            log.info("RuleDispatcher add preAction for {} {} {} ", scene, app, rule);
         }
     }
 
@@ -271,13 +281,16 @@ public class RuleDispatcher {
     private static void addAfterAction(AfterAction afterAction) {
         String app = afterAction.asAfterAction.app();
         String scene = afterAction.asAfterAction.scene();
+        String rule = afterAction.asAfterAction.rule();
 
         initNode(app, scene);
 
         SceneAppHandlerNode sceneAppHandlerNode = sceneHandlerMap.get(scene).appHandlerMap.get(app);
-        if (sceneAppHandlerNode.afterAction == null) {
-            sceneAppHandlerNode.afterAction = afterAction;
-            log.info("RuleDispatcher add afterAction for {} {} ", scene, app);
+        if (!sceneAppHandlerNode.afterActionMap.containsKey(rule)) {
+            sceneAppHandlerNode.afterActionMap.put(rule, afterAction);
+            sceneAppHandlerNode.afterActions.add(afterAction);
+            sceneAppHandlerNode.afterActions.sort(AfterAction.comparator);
+            log.info("RuleDispatcher add afterAction for {} {} {} ", scene, app, rule);
         }
     }
 
@@ -346,7 +359,9 @@ public class RuleDispatcher {
         /**
          * 前置行为
          */
-        PreAction preAction;
+        //PreAction preAction;
+        Map<String, PreAction> preActionMap = new HashMap<>();
+        List<PreAction> preActions = new LinkedList<>();
 
         /**
          * 规则维度，规则控制器
@@ -361,18 +376,34 @@ public class RuleDispatcher {
         /**
          * 后置行为
          */
-        AfterAction afterAction;
+        //AfterAction afterAction;
+        Map<String, AfterAction> afterActionMap = new HashMap<>();
+        List<AfterAction> afterActions = new LinkedList<>();
 
         @Override
         public String toString() {
             Map<String, String> map = new HashMap<>();
             map.put("scene", scene);
             map.put("app", app);
-            map.put("preAction", preAction != null ? preAction.toString() : null);
-            map.put("afterAction", afterAction != null ? afterAction.toString() : null);
-            for (RuleHandler ruleHandler : ruleHandlers) {
-                map.put(ruleHandler.asRuleHandler.rule(), ruleHandler.toString());
+
+            Map<String, String> preActionMap = new HashMap<>();
+            for (PreAction ruleHandler : preActions) {
+                preActionMap.put(ruleHandler.asPreAction.rule(), ruleHandler.toString());
             }
+            map.put("preAction", preActionMap.toString());
+
+            Map<String, String> ruleMap = new HashMap<>();
+            for (RuleHandler ruleHandler : ruleHandlers) {
+                ruleMap.put(ruleHandler.asRuleHandler.rule(), ruleHandler.toString());
+            }
+            map.put("rules", ruleMap.toString());
+
+            Map<String, String> afterActionMap = new HashMap<>();
+            for (AfterAction ruleHandler : afterActions) {
+                afterActionMap.put(ruleHandler.asAfterAction.rule(), ruleHandler.toString());
+            }
+            map.put("afterAction", afterActionMap.toString());
+
             return map.toString();
         }
     }

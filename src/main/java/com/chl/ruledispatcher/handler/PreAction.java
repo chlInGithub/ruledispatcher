@@ -1,5 +1,6 @@
 package com.chl.ruledispatcher.handler;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,6 +20,14 @@ public abstract class PreAction<T extends RuleDispatcherContext> {
      * @return true 立即返回
      */
     abstract protected boolean handle(T ruleDispatcherContext);
+
+    static Comparator<PreAction> comparator = new Comparator<PreAction>() {
+
+        @Override
+        public int compare(PreAction o1, PreAction o2) {
+            return o1.asPreAction.priority() < o2.asPreAction.priority() ? -1 : 1;
+        }
+    };
 
     @Override
     public String toString() {

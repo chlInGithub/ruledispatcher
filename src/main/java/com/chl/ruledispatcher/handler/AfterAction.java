@@ -1,5 +1,6 @@
 package com.chl.ruledispatcher.handler;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,6 +19,14 @@ public abstract class AfterAction<T extends RuleDispatcherContext> {
      * @param ruleDispatcherContext
      */
     abstract protected void handle(T ruleDispatcherContext);
+
+    static Comparator<AfterAction> comparator = new Comparator<AfterAction>() {
+
+        @Override
+        public int compare(AfterAction o1, AfterAction o2) {
+            return o1.asAfterAction.priority() < o2.asAfterAction.priority() ? -1 : 1;
+        }
+    };
 
     @Override
     public String toString() {
